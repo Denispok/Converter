@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Конвертер валют</string>
+    <string name="title_activity_main">Конвертер валют</string>
+
+    <string-array name="animals">
+        <item>Кот</item>
+        <item>Кошка</item>
+        <item>Котёнок</item>
+        <item>Животное</item>
+    </string-array>
+</resources>
