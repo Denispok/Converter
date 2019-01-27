@@ -4,18 +4,16 @@ import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
 import java.net.URL
 import java.net.URLConnection
@@ -25,8 +23,13 @@ import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        private const val RECONNECT_INTERVAL = 3000L
+    }
+
     private var rate1 = 1.0
     private var rate2 = 1.0
+    private var hasConnection = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,11 +59,7 @@ class MainActivity : AppCompatActivity() {
         val onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                setUIEnabled(false)
-                updateRate().invokeOnCompletion {
-                    calcText2()
-                    setUIEnabled(true)
-                }
+                updateRate()
             }
         }
         spinner1.onItemSelectedListener = onItemSelectedListener
@@ -83,35 +82,66 @@ class MainActivity : AppCompatActivity() {
             text2.setText("")
     }
 
-    fun updateCurrencies() = CoroutineScope(Dispatchers.Main).launch {
-        val url = URL("https://free.currencyconverterapi.com/api/v6/currencies/")
-        val connection = url.openConnection()
+    fun updateCurrencies() {
+        CoroutineScope(Dispatchers.Main).launch {
+            setUIEnabled(false)
+            val url = URL("https://free.currencyconverterapi.com/api/v6/currencies/")
+            val connection = url.openConnection()
 
-        val jsonString = parseJSON(connection)
-        val json = JSONObject(jsonString).getJSONObject("results")
+            val jsonString = try {
+                parseJSON(connection)
+            } catch (e: IOException) {
+                networkError()
+                delay(RECONNECT_INTERVAL)
+                updateCurrencies()
+                return@launch
+            }
+            val json = JSONObject(jsonString).getJSONObject("results")
 
-        val currencies = json.keys().asSequence().sorted().toMutableList()
-        val adapter = ArrayAdapter(
-            this@MainActivity,
-            R.layout.support_simple_spinner_dropdown_item,
-            currencies
-        )
+            val currencies = json.keys().asSequence().sorted().toMutableList()
+            val adapter = ArrayAdapter(
+                this@MainActivity,
+                R.layout.support_simple_spinner_dropdown_item,
+                currencies
+            )
 
-        spinner1.adapter = adapter
-        spinner2.adapter = adapter
+            spinner1.adapter = adapter
+            spinner2.adapter = adapter
+            setUIEnabled(true)
+        }
     }
 
-    fun updateRate() = CoroutineScope(Dispatchers.Main).launch {
-        val currency1 = "${spinner1.selectedItem}_${spinner2.selectedItem}"
-        val currency2 = "${spinner2.selectedItem}_${spinner1.selectedItem}"
-        val url = URL("https://free.currencyconverterapi.com/api/v6/convert?q=$currency1,$currency2")
-        val connection = url.openConnection()
 
-        val jsonString = parseJSON(connection)
-        val jsonObject = JSONObject(jsonString).getJSONObject("results")
+    fun updateRate() {
+        CoroutineScope(Dispatchers.Main).launch {
+            setUIEnabled(false)
+            val currency1 = "${spinner1.selectedItem}_${spinner2.selectedItem}"
+            val currency2 = "${spinner2.selectedItem}_${spinner1.selectedItem}"
+            val url = URL("https://free.currencyconverterapi.com/api/v6/convert?q=$currency1,$currency2")
+            val connection = url.openConnection()
 
-        rate1 = jsonObject.getJSONObject(currency1).getDouble("val")
-        rate2 = jsonObject.getJSONObject(currency2).getDouble("val")
+            val jsonString = try {
+                parseJSON(connection)
+            } catch (e: IOException) {
+                networkError()
+                delay(RECONNECT_INTERVAL)
+                updateRate()
+                return@launch
+            }
+            val jsonObject = JSONObject(jsonString).getJSONObject("results")
+
+            rate1 = jsonObject.getJSONObject(currency1).getDouble("val")
+            rate2 = jsonObject.getJSONObject(currency2).getDouble("val")
+            calcText2()
+            setUIEnabled(true)
+        }
+    }
+
+    private fun networkError() {
+        if (hasConnection) {
+            Toast.makeText(this, getString(R.string.network_error_message), Toast.LENGTH_SHORT).show()
+            hasConnection = false
+        }
     }
 
     private fun setUIEnabled(isEnabled: Boolean) {
@@ -129,11 +159,7 @@ class MainActivity : AppCompatActivity() {
             stringBuilder.append(line)
             line = reader.readLine()
         }
+        hasConnection = true
         stringBuilder.toString()
     }
-
-    private fun log(text: String) {
-        Log.d("MYLOG", text)
-    }
-
 }
