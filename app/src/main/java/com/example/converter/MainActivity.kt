@@ -19,6 +19,9 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.URL
 import java.net.URLConnection
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
@@ -34,7 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         text1.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                if (!text1.text.isEmpty() && text1.hasFocus() && text1.isEnabled) calcText2()
+                if (text1.hasFocus() && text1.isEnabled) calcText2()
             }
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -43,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
         text2.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                if (!text2.text.isEmpty() && text2.hasFocus() && text2.isEnabled) calcText1()
+                if (text2.hasFocus() && text2.isEnabled) calcText1()
             }
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -65,11 +68,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun calcText1() {
-        if (!text2.text.isEmpty()) text1.setText((text2.text.toString().toDouble() * rate2).toString())
+        if (!text2.text.isEmpty()) {
+            val num = text2.text.toString().toDouble() * rate2
+            text1.setText(DecimalFormat("#.##", DecimalFormatSymbols.getInstance(Locale.ENGLISH)).format(num))
+        } else
+            text1.setText("")
     }
 
     fun calcText2() {
-        if (!text1.text.isEmpty()) text2.setText((text1.text.toString().toDouble() * rate1).toString())
+        if (!text1.text.isEmpty()) {
+            val num = text1.text.toString().toDouble() * rate1
+            text2.setText(DecimalFormat("#.##", DecimalFormatSymbols.getInstance(Locale.ENGLISH)).format(num))
+        } else
+            text2.setText("")
     }
 
     fun updateCurrencies() = CoroutineScope(Dispatchers.Main).launch {
